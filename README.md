@@ -28,6 +28,6 @@
 1. Finishing the finetune codes for span extraction task and pretrained LM.
 2. Summarizing the tricks of finetune.
 
-## Acknowledge
+## Acknowledgement
 All codes of this project are based on pytorch-pretrained-bert which is the first version of [Transformers](https://github.com/huggingface/transformers). Thanks for all authors of Transformers. 
 
