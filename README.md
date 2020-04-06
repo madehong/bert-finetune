@@ -1,4 +1,4 @@
-#Simplified Codes for fine-tune Bert on varients of Tasks
+Simplified Codes for fine-tune Bert on varients of Tasks
 ​    Many codes are too complex to understand easily. This project aims to show the procedure of finetuning Bert and solve other task easily! 
 
 ## Support Task Type:
@@ -9,11 +9,10 @@
 3. Span extraction task. (To do)
 
 ## Usage:
-
-​    Taking the MRPC task as example:
-​	(1). Download the dataset from [GLUE](https://gluebenchmark.com/) and add it to the dir: "data/MRPC" including three files named train.tsv/dev.tsv/test.tsv.
-​	(2). Download pretrained Bert from [Google-Bert-Uncased-Base](https://github.com/google-research/bert), and unzip it. Run the script "convert_tf2pt.sh" located in dir: bert
-​	(3). Run the fine-tune codes:
+  Taking the MRPC task as example:
+1. Download the dataset from [GLUE](https://gluebenchmark.com/) and add it to the dir: "data/MRPC" including three files named train.tsv/dev.tsv/test.tsv.
+2. Download pretrained Bert from [Google-Bert-Uncased-Base](https://github.com/google-research/bert), and unzip it. Run the script "convert_tf2pt.sh" located in dir: bert
+3. Run the fine-tune codes:
 
 1. Distributed Data Parallel Training:
    CUDA_VISIBLE_DEVICES=0,1,2,3 python -m torch.distributed.launch --nproc_per_node=4 finetune_v2.py --data_dir=data/MRPC/ --do_eval --task_name=mrpc --do_train
