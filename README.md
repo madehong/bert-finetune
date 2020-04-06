@@ -1,9 +1,9 @@
 ## Simplified Codes for fine-tuning Bert on varients of tasks
-  Many codes are too complex to understand easily. This project aims to show the procedure of finetuning Bert and solve other task easily! 
+​    Many codes are too complex to understand easily. This project aims to show the procedure of finetuning Bert and solve other task easily! 
 
 ## Support Task Type:
 1. Sentence-level classification including single sentence classification and sentence pair classification tasks.
-   		E.g. Sentiment Analysis, SNLI and  etc
+   		E.g. Sentiment Analysis, SNLI and  etc.
 2. Token-level classification (sequence labeling task)
    		E.g. NER, POS and etc.
 3. Span extraction task. (To do)
