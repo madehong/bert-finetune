@@ -2,11 +2,12 @@
 ​    Many codes are too complex to understand easily. This project aims to show the procedure of finetuning Bert and solve other task easily! 
 
 ## Support Task Type:
-1. Sentence-level classification including single sentence classification and sentence pair classification tasks.
+1. Sentence-level classification including single sentence classification and sentence pair classification tasks.  
    		E.g. Sentiment Analysis, SNLI and  etc.
-2. Token-level classification (sequence labeling task)
+2. Token-level classification (sequence labeling task).  
    		E.g. NER, POS and etc.
-3. Span extraction task. (To do)
+3. Span extraction task.  
+        To do
 
 ## Usage:
   Taking the MRPC task as example:
@@ -14,12 +15,12 @@
 2. Download pretrained Bert from [Google-Bert-Uncased-Base](https://github.com/google-research/bert), and unzip it. Run the script "convert_tf2pt.sh" located in dir: "bert"
 3. Run the fine-tune codes:  
    (1).Distributed Data Parallel Training:  
-      $ CUDA_VISIBLE_DEVICES=0,1,2,3 python -m torch.distributed.launch --nproc_per_node=4 finetune_v2.py --data_dir=data/MRPC/ --do_eval --task_name=mrpc --do_train  
+      $ CUDA_VISIBLE_DEVICES=0,1,2,3 python -m torch.distributed.launch --nproc_per_node=4 finetune_v2.py --data_dir=data/MRPC/ --task_name=mrpc --do_train --do_predict  
    (2).Data Parallel Training:  
-      $ CUDA_VISIBLE_DEVICES=0,1,2,3 python finetune_v2.py --data_dir=data/MRPC/ --do_eval --task_name=mrpc --do_train  
+      $ CUDA_VISIBLE_DEVICES=0,1,2,3 python finetune_v2.py --data_dir=data/MRPC/ --task_name=mrpc --do_train --do_predict  
    (3).Single GPU Training:  
-      $ CUDA_VISIBLE_DEVICES=3 python finetune_v2.py --data_dir=data/MRPC/ --do_eval --task_name=mrpc --do_train  
-      Attention: the first two methods support half precision training which can reduce the GPU memory use. Just install the [Apex](https://github.com/NVIDIA/apex) and add the aurgument "--ft16"
+      $ CUDA_VISIBLE_DEVICES=3 python finetune_v2.py --data_dir=data/MRPC/ --task_name=mrpc --do_train --do_predict  
+      Attention: the first two methods support half precision training which can reduce the GPU memory use. Just install the [Apex](https://github.com/NVIDIA/apex) and add the aurgument "--ft16". The "Distributed Data Parallel Training" method may encounter some error. If so, pleasure the "Data Parallel Training" method.
 
 ## How to use this project for other task?
 ​    Writing a dataloader for task-specific data. Examples can be found at: "dataset.py"

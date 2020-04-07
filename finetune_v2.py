@@ -3,7 +3,8 @@ import argparse
 import numpy as np
 import random
 from tqdm import tqdm, trange
-from sklearn import metrics
+import sklearn
+import os
 
 import torch
 from torch.utils.data import DataLoader, RandomSampler, SequentialSampler
@@ -27,20 +28,21 @@ if __name__ == '__main__':
 	## Other parameters
 	parser.add_argument("--max_seq_len",                 default=128,   type=int, help="The maximum total input sequence length after WordPiece tokenization.")
 	parser.add_argument("--is_sequence_labeling",        default=False, action='store_true', help="Is sequence labeling task?")
-	parser.add_argument("--do_train",                    default=False, action='store_true', help="Whether to run training.")
-	parser.add_argument("--do_eval",                     default=False, action='store_true', help="Whether to run eval on the dev set.")
+	parser.add_argument("--do_train",                    default=False, action='store_true', help="Whether to train.")
+	parser.add_argument("--do_predict",                  default=False, action='store_true', help="Whether to predict the results of test set.")
 	parser.add_argument("--batch_size",                  default=32,    type=int,   help="Total batch size for training & eval & testing.")
 	parser.add_argument("--learning_rate",               default=5e-5,  type=float, help="The initial learning rate for Adam.")
 	parser.add_argument("--num_train_epochs",            default=3.0,   type=float, help="Total number of training epochs to perform.")
 	parser.add_argument("--warmup_proportion",           default=0.1,   type=float, help="Proportion of training to perform linear LR warmup for. E.g., 0.1 = 10%% of training.")
-	parser.add_argument("--no_cuda",                     default=False, action='store_true', help="Whether not to use CUDA when available")
-	parser.add_argument("--local_rank",                  default=-1,    type=int, help="local_rank for distributed training on gpus")
-	parser.add_argument('--seed',                        default=42,    type=int, help="random seed for initialization")
-	parser.add_argument('--gradient_accumulation_steps', default=1,     type=int, help="Number of updates steps to accumualte before performing a backward/update pass.") 
-	parser.add_argument('--optimize_on_cpu',             default=False, action='store_true', help="Whether to perform optimization and keep the optimizer averages on CPU")
-	parser.add_argument('--fp16',                        default=False, action='store_true', help="Whether to use 16-bit float precision instead of 32-bit")
-	parser.add_argument('--fp16_level',                  default='O1',  type=str,   help="One of ['O0', 'O1', 'O2', 'O3']")
-	parser.add_argument('--pretrained_weights_dir',      default='pretrained_weights/',type=str,  help='Dir path to store pretrained model weights including three files: vocab.txt/bert_config.json/pytorch_model.bin')
+	parser.add_argument("--local_rank",                  default=-1,    type=int,   help="local_rank for distributed training on gpus.")
+	parser.add_argument('--seed',                        default=42,    type=int,   help="random seed for initialization.")
+	parser.add_argument('--gradient_accumulation_steps', default=1,     type=int,   help="Number of updates steps to accumualte before performing a backward/update pass.") 
+	parser.add_argument('--fp16',                        default=False, action='store_true', help="Whether to use 16-bit float precision instead of 32-bit.")
+	parser.add_argument('--fp16_level',                  default='O1',  type=str,   help="One of ['O0', 'O1', 'O2', 'O3'].")
+	parser.add_argument('--pretrained_weights_dir',      default='pretrained_weights/',type=str,  help='Dir to store pretrained model weights including three files: vocab.txt/bert_config.json/pytorch_model.bin.')
+	parser.add_argument('--finetune_weights_dir',        default='finetune_weights/',type=str,  help='Dir to store finetune model weights.')
+	parser.add_argument('--result_dir',                  default='predict_result/',type=str,  help='Dir to store prediction of test data.')
+
 	## Parse all arguments
 	args = parser.parse_args()
 
@@ -121,14 +123,15 @@ if __name__ == '__main__':
 		model = torch.nn.DataParallel(model)
 	
 	if args.do_train:
-		model.train()
 		logging.info('Begin Training...')
 		if args.local_rank != -1:
 			train_sampler = DistributedSampler(data.train_data)
 		else:
 			train_sampler = RandomSampler(data.train_data)
 		train_loader = DataLoader(data.train_data, sampler=train_sampler, batch_size=int(args.batch_size))#, num_workers=3)
+		max_eval_metrics = 0.0
 		for epoch in trange(int(args.num_train_epochs), desc='Train Epoch'):
+			model.train()
 			sum_loss, num_step = 0, 0
 			for step, batch in enumerate(tqdm(train_loader, desc='Train Iter')):
 
@@ -158,13 +161,50 @@ if __name__ == '__main__':
 				model.zero_grad()
 				if step  and step % 20 == 0:
 					logging.info('Epoch: {}; Step: {}; Avg Loss: {}'.format(epoch, step, sum_loss/num_step))
+			
+			#Eval
+			model.eval()
+			logging.info('Begining Eval:')
+			eval_loader = DataLoader(data.dev_data, batch_size=int(args.batch_size))
+			pred, true = [], []
+			for step, batch in enumerate(tqdm(eval_loader, desc='Eval Iter')):
+				batch = (b.to(device) for b in batch)
+				with torch.no_grad():
+					if args.is_sequence_labeling:
+						inputs_ids, valid_ids, segment_ids, attention_mask, labels = batch
+						p, _ = model(inputs_ids, valid_ids, segment_ids, attention_mask)
+					else:
+						inputs_ids, segment_ids, attention_mask, labels = batch
+						p, _ = model(inputs_ids, segment_ids, attention_mask)
+				pred.append(p)
+				true.append(labels)
+			pred = torch.cat(pred).cpu().numpy()
+			true = torch.cat(true).cpu().numpy()
+			if args.is_sequence_labeling:
+				c, s = 0, 0
+				for p, t in zip(pred, true):
+					for p_, t_ in zip(p, t):
+						s += 1
+						if t_ == p_:
+							c += 1
+				metrics = c * 1. / s
+			else:
+				metrics =  sklearn.metrics.accuracy_score(true, pred)
+			logging.info('Task: {}; Eval Results: {}.'.format(args.task_name, metrics))
+			if metrics > max_eval_metrics:
+				if not os.path.exists(args.finetune_weights_dir):
+					os.system('mkdir {}'.format(args.finetune_weights_dir))
+				torch.save(model.state_dict(), args.finetune_weights_dir + 'pytorch_model.bin')
 
-	if args.do_eval:
+	if args.do_predict:
+		if os.path.exists(args.finetune_weights_dir + 'pytorch_model.bin'):
+			logging.info('Loading finetuned weights...')
+			model.load_state_dict(torch.load(args.finetune_weights_dir + 'pytorch_model.bin'))
 		model.eval()
-		logging.info('Begining Eval:')
-		eval_loader = DataLoader(data.dev_data, batch_size=int(args.batch_size))
-		pred, true = [], []
-		for step, batch in enumerate(tqdm(eval_loader, desc='Eval Iter')):
+		logging.info('Begining predicting:')
+		test_loader = DataLoader(data.test_data, batch_size=int(args.batch_size))
+		pred = []
+		for step, batch in enumerate(tqdm(test_loader, desc='Test Iter')):
 			batch = (b.to(device) for b in batch)
 			with torch.no_grad():
 				if args.is_sequence_labeling:
@@ -174,16 +214,13 @@ if __name__ == '__main__':
 					inputs_ids, segment_ids, attention_mask, labels = batch
 					p, _ = model(inputs_ids, segment_ids, attention_mask)
 			pred.append(p)
-			true.append(labels)
 		pred = torch.cat(pred).cpu().numpy()
-		true = torch.cat(true).cpu().numpy()
-		if args.is_sequence_labeling:
-			c, s = 0, 0
-			for p, t in zip(pred, true):
-				for p_, t_ in zip(p, t):
-					s += 1
-					if t_ == p_:
-						c += 1
-			logging.info('Task: {}; Eval Result(ACC): {}'.format(args.task_name, c*1. / s))
-		else:
-			logging.info('Task: {}; Eval Result(ACC): {}'.format(args.task_name, metrics.accuracy_score(true, pred)))
+		if not os.path.exists(args.result_dir):
+			os.system('mkdir {}'.format(args.result_dir))
+		with open(args.result_dir + 'predict.txt', 'w') as f:
+			for x1, x2, p in zip(data.test_data.original_x1, data.test_data.original_x2, pred):
+				x = x1
+				if x2 is not None:
+					x = x + '\t' + x2
+				x = x +	'\t'+ data.reverse_label_map[p]
+				f.write(x + '\n')

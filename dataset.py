@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 
 class Loader():
 	label_map = {}
+	reverse_label_map = {}
 	
 	def load_train_data(self, path):
 		raise NotImplementedError()
@@ -47,6 +48,7 @@ class CoLALoader(Loader):
 			y.append(convert_to_unicode(data[1]))
 			if y[-1] not in self.label_map:
 				self.label_map[y[-1]] = len(self.label_map)
+				self.reverse_label_map[self.label_map[y[-1]]] = y[-1]
 		return x1, x2, y
 	
 	def load_dev_data(self, path):
@@ -73,6 +75,7 @@ class MRPCLoader(Loader):
 			y.append(convert_to_unicode(data[0]))
 			if y[-1] not in self.label_map:
 				self.label_map[y[-1]] = len(self.label_map)
+				self.reverse_label_map[self.label_map[y[-1]]] = y[-1]
 		return x1, x2, y
 	
 	def load_dev_data(self, path):
@@ -99,6 +102,7 @@ class QNLILoader(Loader):
 			y.append(convert_to_unicode(data[3]))
 			if y[-1] not in self.label_map:
 				self.label_map[y[-1]] = len(self.label_map)
+				self.reverse_label_map[self.label_map[y[-1]]] = y[-1]
 		return x1, x2, y
 	
 	def load_dev_data(self, path):
@@ -125,6 +129,7 @@ class QQPLoader(Loader):
 			y.append(convert_to_unicode(data[5]))
 			if y[-1] not in self.label_map:
 				self.label_map[y[-1]] = len(self.label_map)
+				self.reverse_label_map[self.label_map[y[-1]]] = y[-1]
 		return x1, x2, y
 	
 	def load_dev_data(self, path):
@@ -152,6 +157,7 @@ class RTELoader(Loader):
 			y.append(convert_to_unicode(data[3]))
 			if y[-1] not in self.label_map:
 				self.label_map[y[-1]] = len(self.label_map)
+				self.reverse_label_map[self.label_map[y[-1]]] = y[-1]
 		return x1, x2, y
 	
 	def load_dev_data(self, path):
@@ -179,6 +185,7 @@ class SSTLoader(Loader):
 			y.append(convert_to_unicode(data[1]))
 			if y[-1] not in self.label_map:
 				self.label_map[y[-1]] = len(self.label_map)
+				self.reverse_label_map[self.label_map[y[-1]]] = y[-1]
 		return x1, x2, y
 	
 	def load_dev_data(self, path):
@@ -206,6 +213,7 @@ class STSLoader(Loader):
 			y.append(convert_to_unicode(data[-1]))
 			if y[-1] not in self.label_map:
 				self.label_map[y[-1]] = len(self.label_map)
+				self.reverse_label_map[self.label_map[y[-1]]] = y[-1]
 		return x1, x2, y
 	
 	def load_dev_data(self, path):
@@ -233,6 +241,7 @@ class WNLILoader(Loader):
 			y.append(convert_to_unicode(data[3]))
 			if y[-1] not in self.label_map:
 				self.label_map[y[-1]] = len(self.label_map)
+				self.reverse_label_map[self.label_map[y[-1]]] = y[-1]
 		return x1, x2, y
 	
 	def load_dev_data(self, path):
@@ -267,6 +276,7 @@ class SequenceLabelingLoader(Loader):
 				y.append(data[1])
 				if y[-1] not in self.label_map:
 					self.label_map[y[-1]] = len(self.label_map)
+					self.reverse_label_map[self.label_map[y[-1]]] = y[-1]
 		return X1, X2, Y
 	
 	def load_dev_data(self, path):
@@ -356,6 +366,7 @@ class DataProcessor(torch.utils.data.Dataset):
 		
 		x1, x2, y = load_fn(path)
 		self.X, self.Y, self.MASK, self.SEGMENT_IDS, self.VALID_IDS = [], [], [], [], []
+		self.original_x1, self.original_x2 = x1, x2
 		
 		show_num = 1
 		for index, (x1_, x2_, y_) in enumerate(list(zip(x1, x2, y))):
@@ -485,6 +496,8 @@ class Data():
 		self.test_data  = DataProcessor(path+'test.tsv' , loader.load_test_data , loader.label_map, tokenizer, max_seq_len, is_sequence_labeling)
 
 		self.label_size = len(loader.label_map)
+		self.label_map = loader.label_map
+		self.reverse_label_map = loader.reverse_label_map
 
 
 if __name__ == '__main__':
